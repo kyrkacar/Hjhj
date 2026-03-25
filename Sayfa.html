@@ -3,68 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Drawing - Pro (Lock & Flip)</title>
+    <title>AR Drawing App</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; touch-action: none; font-family: sans-serif; }
-        #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #121212; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         
-        /* Resim Katmanı */
-        #container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center; z-index: 2;
+        /* GİRİŞ EKRANI (MENU) */
+        #menu-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1e1e2f 0%, #121212 100%);
+            z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; text-align: center; transition: opacity 0.5s ease;
         }
-        #overlay {
-            width: 250px; /* Başlangıç boyutu */
-            opacity: 0.5;
-            pointer-events: auto; /* Hareket ettirmek için */
-            cursor: move;
-            transform-origin: center;
-            transition: transform 0.1s ease-out; /* Akıcı hareket */
+        #menu-screen h1 { font-size: 2.5rem; margin-bottom: 10px; color: #007bff; text-shadow: 0 0 15px rgba(0,123,255,0.4); }
+        #menu-screen p { font-size: 1rem; opacity: 0.8; margin-bottom: 30px; padding: 0 20px; }
+        .start-btn {
+            padding: 15px 40px; font-size: 1.2rem; font-weight: bold;
+            color: white; background: #007bff; border: none; border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3); cursor: pointer;
         }
 
-        /* Kontroller */
+        /* UYGULAMA ALANI */
+        #app-interface { display: none; width: 100%; height: 100%; }
+        #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 2; }
+        #overlay { width: 250px; opacity: 0.5; transform-origin: center; transition: transform 0.1s ease-out; }
+
         .controls {
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             z-index: 10; display: flex; flex-direction: column; align-items: center; 
-            gap: 8px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 15px; width: 90%;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            gap: 8px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 20px; width: 85%;
         }
-        
         .button-group { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-        button { padding: 8px 15px; border-radius: 10px; border: none; background: #333; color: white; font-weight: bold; font-size: 12px; }
-        button.active { background: #007bff; } /* Aktif buton rengi (Lock için) */
-        
-        input[type="range"] { width: 100%; margin-top: 5px; }
+        button:not(.start-btn) { padding: 8px 12px; border-radius: 8px; border: none; background: #333; color: white; font-size: 11px; font-weight: bold; }
+        button.active { background: #007bff; }
         label { color: white; font-size: 11px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-    <video id="video" autoplay playsinline></video>
-    
-    <div id="container">
-        <img id="overlay" src="https://via.placeholder.com/300?text=Resim+Secin" alt="Çizim">
+    <div id="menu-screen">
+        <h1>AR Drawing</h1>
+        <p>Görselini seç, kağıdının üzerine yansıt ve çizmeye başla!</p>
+        <button class="start-btn" onclick="startApp()">BAŞLA</button>
     </div>
 
-    <div class="controls">
-        <div class="button-group">
-            <button onclick="document.getElementById('fileInput').click()">Resim Seç</button>
-            <button id="lockBtn" onclick="toggleLock()">🔒 Kilitle</button>
-            <button onclick="toggleFlip()">↔ Aynala</button>
-            <button onclick="resetImage()">Sıfırla</button>
+    <div id="app-interface">
+        <video id="video" autoplay playsinline></video>
+        
+        <div id="container">
+            <img id="overlay" src="https://via.placeholder.com/300?text=Resim+Secin" alt="Çizim">
         </div>
-        
-        <input type="file" id="fileInput" accept="image/*" style="display: none;">
-        
-        <label>Saydamlık</label>
-        <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.5">
+
+        <div class="controls">
+            <div class="button-group">
+                <button onclick="document.getElementById('fileInput').click()">📸 Resim Seç</button>
+                <button id="lockBtn" onclick="toggleLock()">🔒 Kilitle</button>
+                <button onclick="toggleFlip()">↔ Aynala</button>
+                <button onclick="resetImage()">🔄 Sıfırla</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <label>Saydamlık</label>
+            <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.5">
+        </div>
     </div>
 
     <script>
+        const menuScreen = document.getElementById('menu-screen');
+        const appInterface = document.getElementById('app-interface');
         const overlay = document.getElementById('overlay');
         const video = document.getElementById('video');
         const lockBtn = document.getElementById('lockBtn');
 
-        // Kamera Başlatma
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(s => video.
+        // Uygulamayı Başlat Butonu
+        async function startApp() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                
+                // Menüyü gizle, arayüzü göster
+                menuScreen.style.opacity = '0';
+                setTimeout(() => {
+                    menuScreen.style.display = 'none';
+                    appInterface.style.display = 'block';
+                }, 500);
+            } catch (err) {
+                alert("Kamera izni gerekiyor: " + err);
+            }
