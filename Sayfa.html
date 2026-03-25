@@ -3,108 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Drawing - Pro</title>
+    <title>AR Drawing App</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; touch-action: none; }
-        #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #121212; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         
-        /* Resim Katmanı */
-        #container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center; z-index: 2;
+        /* GİRİŞ EKRANI (MENU) */
+        #menu-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #1e1e2f 0%, #121212 100%);
+            z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: white; text-align: center; transition: opacity 0.5s ease;
         }
-        #overlay {
-            width: 250px; /* Başlangıç boyutu */
-            opacity: 0.5;
-            pointer-events: auto; /* Hareket ettirmek için artık dokunulabilir olmalı */
-            cursor: move;
-            transform-origin: center;
+        #menu-screen h1 { font-size: 2.5rem; margin-bottom: 10px; color: #007bff; text-shadow: 0 0 15px rgba(0,123,255,0.4); }
+        #menu-screen p { font-size: 1rem; opacity: 0.8; margin-bottom: 30px; padding: 0 20px; }
+        .start-btn {
+            padding: 15px 40px; font-size: 1.2rem; font-weight: bold;
+            color: white; background: #007bff; border: none; border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3); cursor: pointer;
         }
+
+        /* UYGULAMA ALANI */
+        #app-interface { display: none; width: 100%; height: 100%; }
+        #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 2; }
+        #overlay { width: 250px; opacity: 0.5; transform-origin: center; transition: transform 0.1s ease-out; }
 
         .controls {
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             z-index: 10; display: flex; flex-direction: column; align-items: center; 
-            gap: 8px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 15px; width: 90%;
+            gap: 8px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 20px; width: 85%;
         }
-        button { padding: 8px 15px; border-radius: 10px; border: none; background: #007bff; color: white; font-weight: bold; }
-        input[type="range"] { width: 100%; }
-        label { color: white; font-size: 12px; }
+        .button-group { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        button:not(.start-btn) { padding: 8px 12px; border-radius: 8px; border: none; background: #333; color: white; font-size: 11px; font-weight: bold; }
+        button.active { background: #007bff; }
+        label { color: white; font-size: 11px; margin-top: 5px; }
     </style>
 </head>
 <body>
 
-    <video id="video" autoplay playsinline></video>
-    
-    <div id="container">
-        <img id="overlay" src="https://via.placeholder.com/300?text=Resim+Secin" alt="Çizim">
+    <div id="menu-screen">
+        <h1>AR Drawing</h1>
+        <p>Görselini seç, kağıdının üzerine yansıt ve çizmeye başla!</p>
+        <button class="start-btn" onclick="startApp()">BAŞLA</button>
     </div>
 
-    <div class="controls">
-        <div style="display:flex; gap:10px;">
-            <button onclick="document.getElementById('fileInput').click()">Resim Seç</button>
-            <button onclick="resetImage()">Sıfırla</button>
+    <div id="app-interface">
+        <video id="video" autoplay playsinline></video>
+        
+        <div id="container">
+            <img id="overlay" src="https://via.placeholder.com/300?text=Resim+Secin" alt="Çizim">
         </div>
-        <input type="file" id="fileInput" accept="image/*" style="display: none;">
-        <label>Saydamlık</label>
-        <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.5">
+
+        <div class="controls">
+            <div class="button-group">
+                <button onclick="document.getElementById('fileInput').click()">📸 Resim Seç</button>
+                <button id="lockBtn" onclick="toggleLock()">🔒 Kilitle</button>
+                <button onclick="toggleFlip()">↔ Aynala</button>
+                <button onclick="resetImage()">🔄 Sıfırla</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <label>Saydamlık</label>
+            <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.5">
+        </div>
     </div>
 
     <script>
+        const menuScreen = document.getElementById('menu-screen');
+        const appInterface = document.getElementById('app-interface');
         const overlay = document.getElementById('overlay');
         const video = document.getElementById('video');
+        const lockBtn = document.getElementById('lockBtn');
 
-        // Kamera Başlatma
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(s => video.srcObject = s);
+        // Uygulamayı Başlat Butonu
+        async function startApp() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                
+                // Menüyü gizle, arayüzü göster
+                menuScreen.style.opacity = '0';
+                setTimeout(() => {
+                    menuScreen.style.display = 'none';
+                    appInterface.style.display = 'block';
+                }, 500);
+            } catch (err) {
+                alert("Kamera izni gerekiyor: " + err);
+            }
+        }
 
-        // --- HAREKET VE ZOOM KONTROLLERİ ---
-        let scale = 1, rotation = 0, posX = 0, posY = 0;
-        let startX, startY, startScale, startRotation;
-        let isDragging = false;
+        // --- HAREKET KONTROLLERİ ---
+        let scale = 1, posX = 0, posY = 0, flipX = 1;
+        let startX, startY, startScale, initialDist;
+        let isDragging = false, isLocked = false;
 
-        const container = document.body;
+        document.body.addEventListener('touchstart', (e) => {
+            if (isLocked || menuScreen.style.display !== 'none') return;
 
-        container.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 isDragging = true;
                 startX = e.touches[0].clientX - posX;
                 startY = e.touches[0].clientY - posY;
             } else if (e.touches.length === 2) {
-                // İki parmakla zoom başlatma
                 isDragging = false;
-                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
                 startScale = scale;
-                this.initialDist = dist;
             }
         });
 
-        container.addEventListener('touchmove', (e) => {
+        document.body.addEventListener('touchmove', (e) => {
+            if (isLocked) return;
             if (isDragging && e.touches.length === 1) {
                 posX = e.touches[0].clientX - startX;
                 posY = e.touches[0].clientY - startY;
             } else if (e.touches.length === 2) {
                 const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                scale = startScale * (dist / this.initialDist);
+                scale = startScale * (dist / initialDist);
             }
             updateTransform();
         });
 
-        container.addEventListener('touchend', () => { isDragging = false; });
+        document.body.addEventListener('touchend', () => { isDragging = false; });
 
         function updateTransform() {
-            overlay.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            overlay.style.transform = `translate(${posX}px, ${posY}px) scale(${scale * flipX}, ${scale})`;
         }
 
+        function toggleLock() {
+            isLocked = !isLocked;
+            lockBtn.textContent = isLocked ? "🔓 Kilidi Aç" : "🔒 Kilitle";
+            lockBtn.classList.toggle('active');
+            overlay.style.pointerEvents = isLocked ? "none" : "auto";
+        }
+
+        function toggleFlip() { flipX *= -1; updateTransform(); }
+
         function resetImage() {
-            scale = 1; posX = 0; posY = 0;
+            scale = 1; posX = 0; posY = 0; flipX = 1;
+            isLocked = false;
+            lockBtn.textContent = "🔒 Kilitle";
+            lockBtn.classList.remove('active');
             updateTransform();
         }
 
-        // Resim Seçme ve Opaklık aynı kalıyor
         document.getElementById('fileInput').onchange = (e) => {
-            overlay.src = URL.createObjectURL(e.target.files[0]);
-            resetImage();
+            if (e.target.files[0]) {
+                overlay.src = URL.createObjectURL(e.target.files[0]);
+                resetImage();
+            }
         };
+
         document.getElementById('opacity').oninput = (e) => {
             overlay.style.opacity = e.target.value;
         };
