@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AR Drawing - Pro</title>
+    <title>AR Drawing - Pro (Lock & Flip)</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; touch-action: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; touch-action: none; font-family: sans-serif; }
         #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         
         /* Resim Katmanı */
@@ -16,19 +16,26 @@
         #overlay {
             width: 250px; /* Başlangıç boyutu */
             opacity: 0.5;
-            pointer-events: auto; /* Hareket ettirmek için artık dokunulabilir olmalı */
+            pointer-events: auto; /* Hareket ettirmek için */
             cursor: move;
             transform-origin: center;
+            transition: transform 0.1s ease-out; /* Akıcı hareket */
         }
 
+        /* Kontroller */
         .controls {
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             z-index: 10; display: flex; flex-direction: column; align-items: center; 
-            gap: 8px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 15px; width: 90%;
+            gap: 8px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 15px; width: 90%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-        button { padding: 8px 15px; border-radius: 10px; border: none; background: #007bff; color: white; font-weight: bold; }
-        input[type="range"] { width: 100%; }
-        label { color: white; font-size: 12px; }
+        
+        .button-group { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        button { padding: 8px 15px; border-radius: 10px; border: none; background: #333; color: white; font-weight: bold; font-size: 12px; }
+        button.active { background: #007bff; } /* Aktif buton rengi (Lock için) */
+        
+        input[type="range"] { width: 100%; margin-top: 5px; }
+        label { color: white; font-size: 11px; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -40,74 +47,24 @@
     </div>
 
     <div class="controls">
-        <div style="display:flex; gap:10px;">
+        <div class="button-group">
             <button onclick="document.getElementById('fileInput').click()">Resim Seç</button>
+            <button id="lockBtn" onclick="toggleLock()">🔒 Kilitle</button>
+            <button onclick="toggleFlip()">↔ Aynala</button>
             <button onclick="resetImage()">Sıfırla</button>
         </div>
+        
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        
         <label>Saydamlık</label>
-        <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.5">
+        <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.5">
     </div>
 
     <script>
         const overlay = document.getElementById('overlay');
         const video = document.getElementById('video');
+        const lockBtn = document.getElementById('lockBtn');
 
         // Kamera Başlatma
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(s => video.srcObject = s);
-
-        // --- HAREKET VE ZOOM KONTROLLERİ ---
-        let scale = 1, rotation = 0, posX = 0, posY = 0;
-        let startX, startY, startScale, startRotation;
-        let isDragging = false;
-
-        const container = document.body;
-
-        container.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1) {
-                isDragging = true;
-                startX = e.touches[0].clientX - posX;
-                startY = e.touches[0].clientY - posY;
-            } else if (e.touches.length === 2) {
-                // İki parmakla zoom başlatma
-                isDragging = false;
-                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                startScale = scale;
-                this.initialDist = dist;
-            }
-        });
-
-        container.addEventListener('touchmove', (e) => {
-            if (isDragging && e.touches.length === 1) {
-                posX = e.touches[0].clientX - startX;
-                posY = e.touches[0].clientY - startY;
-            } else if (e.touches.length === 2) {
-                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                scale = startScale * (dist / this.initialDist);
-            }
-            updateTransform();
-        });
-
-        container.addEventListener('touchend', () => { isDragging = false; });
-
-        function updateTransform() {
-            overlay.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-        }
-
-        function resetImage() {
-            scale = 1; posX = 0; posY = 0;
-            updateTransform();
-        }
-
-        // Resim Seçme ve Opaklık aynı kalıyor
-        document.getElementById('fileInput').onchange = (e) => {
-            overlay.src = URL.createObjectURL(e.target.files[0]);
-            resetImage();
-        };
-        document.getElementById('opacity').oninput = (e) => {
-            overlay.style.opacity = e.target.value;
-        };
-    </script>
-</body>
-</html>
+            .then(s => video.
