@@ -3,78 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kendi AR Drawing Uygulamam</title>
+    <title>AR Drawing - Pro</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: black; touch-action: none; }
+        #video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         
-        /* En alt katman: Kamera */
-        #video {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; object-fit: cover; z-index: 1;
+        /* Resim Katmanı */
+        #container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center; z-index: 2;
         }
-
-        /* Orta katman: Çizilecek Resim */
         #overlay {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%; opacity: 0.5; z-index: 2;
-            pointer-events: none; /* Resme dokunmayı engeller, alttaki kontrollere basabilirsin */
+            width: 250px; /* Başlangıç boyutu */
+            opacity: 0.5;
+            pointer-events: auto; /* Hareket ettirmek için artık dokunulabilir olmalı */
+            cursor: move;
+            transform-origin: center;
         }
 
-        /* Üst katman: Kontroller */
         .controls {
-            position: fixed; bottom: 20px; left: 0; width: 100%;
-            z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 10px;
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            z-index: 10; display: flex; flex-direction: column; align-items: center; 
+            gap: 8px; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 15px; width: 90%;
         }
-        
-        input[type="range"] { width: 80%; }
-        button { padding: 10px 20px; border-radius: 20px; border: none; background: white; font-weight: bold; }
+        button { padding: 8px 15px; border-radius: 10px; border: none; background: #007bff; color: white; font-weight: bold; }
+        input[type="range"] { width: 100%; }
+        label { color: white; font-size: 12px; }
     </style>
 </head>
 <body>
 
     <video id="video" autoplay playsinline></video>
-    <img id="overlay" src="https://via.placeholder.com/300" alt="Resim Seçilmedi">
+    
+    <div id="container">
+        <img id="overlay" src="https://via.placeholder.com/300?text=Resim+Secin" alt="Çizim">
+    </div>
 
     <div class="controls">
+        <div style="display:flex; gap:10px;">
+            <button onclick="document.getElementById('fileInput').click()">Resim Seç</button>
+            <button onclick="resetImage()">Sıfırla</button>
+        </div>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
-        <button onclick="document.getElementById('fileInput').click()">Resim Seç</button>
-        <label style="color: white;">Saydamlık:</label>
+        <label>Saydamlık</label>
         <input type="range" id="opacity" min="0" max="1" step="0.1" value="0.5">
     </div>
 
     <script>
-        const video = document.getElementById('video');
         const overlay = document.getElementById('overlay');
-        const fileInput = document.getElementById('fileInput');
-        const opacitySlider = document.getElementById('opacity');
+        const video = document.getElementById('video');
 
-        // Kamerayı Başlat
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                video.srcObject = stream;
-            } catch (err) {
-                alert("Kamera izni verilmedi: " + err);
+        // Kamera Başlatma
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(s => video.srcObject = s);
+
+        // --- HAREKET VE ZOOM KONTROLLERİ ---
+        let scale = 1, rotation = 0, posX = 0, posY = 0;
+        let startX, startY, startScale, startRotation;
+        let isDragging = false;
+
+        const container = document.body;
+
+        container.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - posX;
+                startY = e.touches[0].clientY - posY;
+            } else if (e.touches.length === 2) {
+                // İki parmakla zoom başlatma
+                isDragging = false;
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                startScale = scale;
+                this.initialDist = dist;
             }
+        });
+
+        container.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches.length === 1) {
+                posX = e.touches[0].clientX - startX;
+                posY = e.touches[0].clientY - startY;
+            } else if (e.touches.length === 2) {
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                scale = startScale * (dist / this.initialDist);
+            }
+            updateTransform();
+        });
+
+        container.addEventListener('touchend', () => { isDragging = false; });
+
+        function updateTransform() {
+            overlay.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
         }
 
-        // Resim Yükle
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                overlay.src = URL.createObjectURL(file);
-            }
-        });
+        function resetImage() {
+            scale = 1; posX = 0; posY = 0;
+            updateTransform();
+        }
 
-        // Saydamlığı Ayarla
-        opacitySlider.addEventListener('input', (e) => {
+        // Resim Seçme ve Opaklık aynı kalıyor
+        document.getElementById('fileInput').onchange = (e) => {
+            overlay.src = URL.createObjectURL(e.target.files[0]);
+            resetImage();
+        };
+        document.getElementById('opacity').oninput = (e) => {
             overlay.style.opacity = e.target.value;
-        });
-
-        startCamera();
+        };
     </script>
 </body>
 </html>
